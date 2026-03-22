@@ -5,3 +5,4 @@ data/samples/
 data/syllabus.db
 .env
 .DS_Store
+syllabi_index.csv

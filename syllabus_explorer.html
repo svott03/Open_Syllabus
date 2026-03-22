@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyllabusLens — Reading Assignment Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #f7f4ef;
+    --paper: #fdfcf9;
+    --ink: #1a1a18;
+    --ink-mid: #4a4a45;
+    --ink-light: #8a8a82;
+    --rule: #d8d5ce;
+    --rule-light: #ece9e2;
+    --accent: #1a3a6e;
+    --accent-light: #e8eef7;
+    --accent-mid: #2d5aaa;
+    --warn: #8b1a1a;
+    --chip-psych: #e8f0e8;
+    --chip-psych-text: #2a4a2a;
+    --chip-cs: #e8eaf5;
+    --chip-cs-text: #1a2060;
+    --chip-soc: #f5ece8;
+    --chip-soc-text: #5a2010;
+    --chip-econ: #f5f0e0;
+    --chip-econ-text: #4a3800;
+    --chip-poli: #ede8f5;
+    --chip-poli-text: #3a1a60;
+    --chip-anth: #e8f5f0;
+    --chip-anth-text: #0a4030;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ─── LOGIN ─────────────────────────────────────────── */
+  #login-screen {
+    position: fixed; inset: 0;
+    background: var(--paper);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 1000;
+    border-bottom: 3px solid var(--accent);
+  }
+
+  .login-wordmark {
+    font-family: 'EB Garamond', serif;
+    font-size: 2.4rem;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .login-wordmark span { color: var(--accent); }
+
+  .login-sub {
+    font-size: 12px;
+    color: var(--ink-light);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .login-box {
+    width: 340px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    padding: 32px;
+  }
+
+  .login-box label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-mid);
+    margin-bottom: 6px;
+    margin-top: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .login-box label:first-child { margin-top: 0; }
+
+  .login-box input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--rule);
+    background: var(--cream);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    outline: none;
+  }
+
+  .login-box input:focus { border-color: var(--accent); }
+
+  .login-hint {
+    font-size: 11px;
+    color: var(--ink-light);
+    margin-top: 8px;
+    font-style: italic;
+    font-family: 'EB Garamond', serif;
+  }
+
+  #login-btn {
+    margin-top: 24px;
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  #login-btn:hover { background: var(--accent-mid); }
+
+  .login-footer {
+    margin-top: 48px;
+    font-size: 11px;
+    color: var(--ink-light);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ─── MAIN APP ───────────────────────────────────────── */
+  #app { display: none; min-height: 100vh; }
+
+  /* Top bar */
+  .topbar {
+    background: var(--paper);
+    border-bottom: 2px solid var(--ink);
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    height: 52px;
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .topbar-logo {
+    font-family: 'EB Garamond', serif;
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+
+  .topbar-logo span { color: var(--accent); }
+
+  .topbar-tagline {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-light);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-left: 20px;
+    border-left: 1px solid var(--rule);
+    padding-left: 20px;
+  }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .topbar-user {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-mid);
+  }
+
+  .topbar-logout {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    cursor: pointer;
+    background: none;
+    border: none;
+    letter-spacing: 0.06em;
+    text-decoration: underline;
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: calc(100vh - 52px);
+  }
+
+  /* Sidebar filters */
+  .sidebar {
+    background: var(--paper);
+    border-right: 1px solid var(--rule);
+    padding: 28px 20px;
+    position: sticky;
+    top: 52px;
+    height: calc(100vh - 52px);
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--rule-light);
+  }
+
+  .sidebar-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+
+  .sidebar-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .filter-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--rule);
+    background: var(--cream);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8a82'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+
+  .filter-select:focus { border-color: var(--accent); }
+
+  /* Title search */
+  .title-search-wrapper { position: relative; }
+
+  #title-search {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--rule);
+    background: var(--cream);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+  }
+
+  #title-search:focus { border-color: var(--accent); }
+
+  #title-search::placeholder { color: var(--ink-light); font-style: italic; }
+
+  #title-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+  }
+
+  .title-option {
+    padding: 8px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--rule-light);
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  .title-option:hover { background: var(--accent-light); color: var(--accent); }
+
+  .selected-title {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--accent-light);
+    border: 1px solid #b0c4e0;
+    padding: 8px 10px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--accent);
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .clear-title {
+    cursor: pointer;
+    font-style: normal;
+    font-weight: 500;
+    flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--accent);
+  }
+
+  .mode-indicator {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 4px 8px;
+    margin-top: 6px;
+    display: inline-block;
+  }
+
+  .mode-assigned { background: var(--accent); color: #fff; }
+  .mode-coassigned { background: var(--warn); color: #fff; }
+
+  .apply-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .apply-btn:hover { background: var(--accent); }
+
+  .reset-btn {
+    width: 100%;
+    padding: 8px;
+    background: none;
+    color: var(--ink-light);
+    border: 1px solid var(--rule);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: border-color 0.12s, color 0.12s;
+  }
+
+  .reset-btn:hover { border-color: var(--ink-mid); color: var(--ink); }
+
+  /* Main content */
+  .main {
+    padding: 28px 36px;
+    background: var(--cream);
+  }
+
+  .main-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .main-title {
+    font-family: 'EB Garamond', serif;
+    font-size: 1.6rem;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1;
+  }
+
+  .main-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-light);
+    margin-top: 6px;
+  }
+
+  .main-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .result-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-mid);
+    padding: 6px 10px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+  }
+
+  .download-btn {
+    padding: 8px 14px;
+    background: var(--paper);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.12s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .download-btn:hover { background: var(--accent-light); }
+
+  /* Active filters bar */
+  .active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+    min-height: 0;
+  }
+
+  .filter-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    background: var(--ink);
+    color: var(--paper);
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .filter-pill-remove {
+    cursor: pointer;
+    opacity: 0.6;
+  }
+
+  .filter-pill-remove:hover { opacity: 1; }
+
+  /* Table */
+  .table-wrap {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead tr {
+    border-bottom: 2px solid var(--ink);
+  }
+
+  th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mid);
+    padding: 11px 14px;
+    text-align: left;
+    white-space: nowrap;
+    background: var(--paper);
+  }
+
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+  th.sorted { color: var(--accent); }
+
+  td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule-light);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f5f2eb; }
+
+  .rank-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-light);
+    width: 36px;
+    text-align: right;
+    padding-right: 8px;
+  }
+
+  .title-cell {
+    font-family: 'EB Garamond', serif;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.35;
+    min-width: 260px;
+    max-width: 340px;
+  }
+
+  .title-cell .author {
+    font-size: 12px;
+    color: var(--ink-light);
+    font-style: italic;
+    margin-top: 2px;
+    font-family: 'EB Garamond', serif;
+  }
+
+  .title-link {
+    cursor: pointer;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.12s, color 0.12s;
+  }
+
+  .title-link:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .chips-cell { min-width: 140px; }
+
+  .chip {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    margin: 2px 2px 2px 0;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: opacity 0.1s;
+  }
+
+  .chip:hover { opacity: 0.75; }
+
+  .chip-Psychology { background: var(--chip-psych); color: var(--chip-psych-text); }
+  .chip-ComputerScience { background: var(--chip-cs); color: var(--chip-cs-text); }
+  .chip-Sociology { background: var(--chip-soc); color: var(--chip-soc-text); }
+  .chip-Economics { background: var(--chip-econ); color: var(--chip-econ-text); }
+  .chip-PoliticalScience { background: var(--chip-poli); color: var(--chip-poli-text); }
+  .chip-Anthropology { background: var(--chip-anth); color: var(--chip-anth-text); }
+
+  .score-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .score-bar-wrap {
+    width: 80px;
+    height: 4px;
+    background: var(--rule);
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+
+  .score-bar {
+    height: 100%;
+    background: var(--accent);
+    display: block;
+  }
+
+  .school-link {
+    color: var(--ink-light);
+    cursor: pointer;
+    border-bottom: 1px dashed var(--rule);
+    transition: color 0.12s, border-color 0.12s;
+  }
+
+  .school-link:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .coassign-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    background: #fdf0e8;
+    color: var(--warn);
+    border: 1px solid #e8c8b0;
+  }
+
+  /* Sparkline */
+  .spark-cell { width: 90px; }
+
+  .sparkline {
+    display: block;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-top: 1px solid var(--rule);
+    background: var(--paper);
+    margin-top: 0;
+  }
+
+  .page-info {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-light);
+  }
+
+  .page-btns {
+    display: flex;
+    gap: 2px;
+  }
+
+  .page-btn {
+    padding: 5px 10px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--ink-mid);
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .page-btn:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .page-btn:disabled { opacity: 0.35; cursor: default; }
+
+  /* Empty state */
+  .empty-state {
+    padding: 64px 32px;
+    text-align: center;
+    color: var(--ink-light);
+  }
+
+  .empty-state .es-title {
+    font-family: 'EB Garamond', serif;
+    font-size: 1.4rem;
+    margin-bottom: 8px;
+    color: var(--ink-mid);
+  }
+
+  .empty-state .es-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 12px 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Coassignment header banner */
+  .coassign-banner {
+    background: #fff8f0;
+    border: 1px solid #e8c8b0;
+    border-left: 3px solid var(--warn);
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .coassign-banner-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--warn);
+    letter-spacing: 0.04em;
+  }
+
+  .coassign-banner-title {
+    font-family: 'EB Garamond', serif;
+    font-size: 14px;
+    color: var(--ink);
+    font-style: italic;
+    margin-top: 2px;
+  }
+
+  .coassign-clear {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--warn);
+    cursor: pointer;
+    text-decoration: underline;
+    background: none;
+    border: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── LOGIN ─── -->
+<div id="login-screen">
+  <div class="login-wordmark">Syllabus<span>Lens</span></div>
+  <div class="login-sub">Reading Assignment Explorer · Demo</div>
+  <div class="login-box">
+    <label>Username</label>
+    <input type="text" id="login-user" placeholder="e.g. researcher@osu.edu" />
+    <label>Password</label>
+    <input type="password" id="login-pass" placeholder="••••••••" />
+    <div class="login-hint">Any credentials accepted — Google OAuth in production.</div>
+    <button id="login-btn" onclick="doLogin()">Sign In →</button>
+  </div>
+  <div class="login-footer">OSU · UFL · UTAustin Consortium Demo · 2025</div>
+</div>
+
+<!-- ─── APP ─── -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">Syllabus<span>Lens</span></div>
+    <div class="topbar-tagline">Reading Assignment Explorer</div>
+    <div class="topbar-right">
+      <span class="topbar-user" id="topbar-username"></span>
+      <button class="topbar-logout" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <span class="sidebar-label">Institution</span>
+        <select class="filter-select" id="filter-school">
+          <option value="">All Schools</option>
+          <option value="OSU">Ohio State University</option>
+          <option value="UFL">University of Florida</option>
+          <option value="UTAustin">UT Austin</option>
+        </select>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Academic Field</span>
+        <select class="filter-select" id="filter-topic">
+          <option value="">All Fields</option>
+          <option value="Psychology">Psychology</option>
+          <option value="Computer Science">Computer Science</option>
+          <option value="Sociology">Sociology</option>
+          <option value="Economics">Economics</option>
+          <option value="Political Science">Political Science</option>
+          <option value="Anthropology">Anthropology</option>
+        </select>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Title Search</span>
+        <div class="title-search-wrapper">
+          <input type="text" id="title-search" placeholder="Search titles…" autocomplete="off"
+            oninput="onTitleInput()" onfocus="onTitleFocus()" />
+          <div id="title-dropdown"></div>
+        </div>
+        <div id="selected-title-display"></div>
+        <div id="mode-badge"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <button class="apply-btn" onclick="applyFilters()">Apply Filters</button>
+        <button class="reset-btn" onclick="resetAll()">Reset All</button>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Show results</span>
+        <select class="filter-select" id="filter-n">
+          <option value="10">Top 10</option>
+          <option value="25">Top 25</option>
+          <option value="50">Top 50</option>
+          <option value="100">All (100)</option>
+        </select>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="main-header">
+        <div>
+          <div class="main-title" id="main-title">Most Assigned Readings</div>
+          <div class="main-subtitle" id="main-subtitle">All institutions · All fields · Ranked by assignment count</div>
+        </div>
+        <div class="main-actions">
+          <div class="result-count" id="result-count">100 titles</div>
+          <button class="download-btn" onclick="downloadCSV()">
+            ↓ Download CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="active-filters" id="active-filters"></div>
+
+      <div id="coassign-banner" class="coassign-banner" style="display:none">
+        <div>
+          <div class="coassign-banner-text">CO-ASSIGNMENT MODE</div>
+          <div class="coassign-banner-title" id="coassign-pivot-title"></div>
+        </div>
+        <button class="coassign-clear" onclick="clearPivot()">Clear pivot ×</button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Title / Author</th>
+              <th>Fields</th>
+              <th class="sortable sorted" id="th-score" onclick="sortBy('score')">Score ↓</th>
+              <th>Syllabi</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+        <div id="empty-state" class="empty-state" style="display:none">
+          <div class="es-title">No titles match your filters.</div>
+          <div class="es-sub">Try broadening the field or institution selection.</div>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── DATA GENERATION ─────────────────────────────────────────────────────────
+
+const FIELDS = ['Psychology','Computer Science','Sociology','Economics','Political Science','Anthropology'];
+const SCHOOLS = ['OSU','UFL','UTAustin'];
+
+const RAW_TITLES = [
+  // Psychology
+  {t:"Thinking, Fast and Slow", a:"Daniel Kahneman", f:["Psychology","Economics"]},
+  {t:"The Interpretation of Dreams", a:"Sigmund Freud", f:["Psychology"]},
+  {t:"Influence: The Psychology of Persuasion", a:"Robert Cialdini", f:["Psychology","Sociology"]},
+  {t:"Man's Search for Meaning", a:"Viktor Frankl", f:["Psychology"]},
+  {t:"The Diagnostic and Statistical Manual, 5th ed.", a:"APA", f:["Psychology"]},
+  {t:"Stumbling on Happiness", a:"Daniel Gilbert", f:["Psychology"]},
+  {t:"Drive: The Surprising Truth About Motivation", a:"Daniel H. Pink", f:["Psychology","Economics"]},
+  {t:"Flow: The Psychology of Optimal Experience", a:"Mihaly Csikszentmihalyi", f:["Psychology"]},
+  {t:"Attached: The New Science of Adult Attachment", a:"Levine & Heller", f:["Psychology"]},
+  {t:"Quiet: The Power of Introverts", a:"Susan Cain", f:["Psychology","Sociology"]},
+  {t:"The Body Keeps the Score", a:"Bessel van der Kolk", f:["Psychology"]},
+  {t:"Blink: The Power of Thinking Without Thinking", a:"Malcolm Gladwell", f:["Psychology"]},
+  {t:"Predictably Irrational", a:"Dan Ariely", f:["Psychology","Economics"]},
+  {t:"The Social Animal", a:"Elliot Aronson", f:["Psychology","Sociology"]},
+
+  // Computer Science
+  {t:"The Algorithm Design Manual", a:"Steven Skiena", f:["Computer Science"]},
+  {t:"Introduction to Algorithms", a:"Cormen, Leiserson, Rivest & Stein", f:["Computer Science"]},
+  {t:"The Pragmatic Programmer", a:"Hunt & Thomas", f:["Computer Science"]},
+  {t:"Artificial Intelligence: A Modern Approach", a:"Russell & Norvig", f:["Computer Science"]},
+  {t:"Deep Learning", a:"Goodfellow, Bengio & Courville", f:["Computer Science"]},
+  {t:"Clean Code", a:"Robert C. Martin", f:["Computer Science"]},
+  {t:"The Mythical Man-Month", a:"Frederick P. Brooks", f:["Computer Science"]},
+  {t:"Structure and Interpretation of Computer Programs", a:"Abelson & Sussman", f:["Computer Science"]},
+  {t:"Compilers: Principles, Techniques, and Tools", a:"Aho, Lam, Sethi & Ullman", f:["Computer Science"]},
+  {t:"Computer Networks", a:"Tanenbaum & Wetherall", f:["Computer Science"]},
+  {t:"Weapons of Math Destruction", a:"Cathy O'Neil", f:["Computer Science","Sociology"]},
+  {t:"The Shallows: What the Internet is Doing to Our Brains", a:"Nicholas Carr", f:["Computer Science","Psychology"]},
+
+  // Sociology
+  {t:"The Sociological Imagination", a:"C. Wright Mills", f:["Sociology"]},
+  {t:"Distinction: A Social Critique of the Judgement of Taste", a:"Pierre Bourdieu", f:["Sociology"]},
+  {t:"The Protestant Ethic and the Spirit of Capitalism", a:"Max Weber", f:["Sociology","Economics"]},
+  {t:"Bowling Alone", a:"Robert D. Putnam", f:["Sociology","Political Science"]},
+  {t:"The Rules of Sociological Method", a:"Émile Durkheim", f:["Sociology"]},
+  {t:"Stigma: Notes on the Management of Spoiled Identity", a:"Erving Goffman", f:["Sociology","Psychology"]},
+  {t:"Evicted: Poverty and Profit in the American City", a:"Matthew Desmond", f:["Sociology","Economics"]},
+  {t:"The Presentation of Self in Everyday Life", a:"Erving Goffman", f:["Sociology"]},
+  {t:"Nickel and Dimed", a:"Barbara Ehrenreich", f:["Sociology","Economics"]},
+  {t:"The New Jim Crow", a:"Michelle Alexander", f:["Sociology","Political Science"]},
+  {t:"Outliers: The Story of Success", a:"Malcolm Gladwell", f:["Sociology"]},
+  {t:"Strangers in Their Own Land", a:"Arlie Russell Hochschild", f:["Sociology","Political Science"]},
+
+  // Economics
+  {t:"Capital in the Twenty-First Century", a:"Thomas Piketty", f:["Economics","Political Science"]},
+  {t:"The Wealth of Nations", a:"Adam Smith", f:["Economics"]},
+  {t:"Freakonomics", a:"Levitt & Dubner", f:["Economics","Sociology"]},
+  {t:"The General Theory of Employment, Interest and Money", a:"John Maynard Keynes", f:["Economics"]},
+  {t:"Poor Economics", a:"Banerjee & Duflo", f:["Economics","Sociology"]},
+  {t:"Nudge", a:"Thaler & Sunstein", f:["Economics","Psychology"]},
+  {t:"Animal Spirits", a:"Akerlof & Shiller", f:["Economics","Psychology"]},
+  {t:"The Entrepreneurial State", a:"Mariana Mazzucato", f:["Economics","Political Science"]},
+  {t:"Development as Freedom", a:"Amartya Sen", f:["Economics","Political Science"]},
+  {t:"When Genius Failed", a:"Roger Lowenstein", f:["Economics"]},
+  {t:"The Big Short", a:"Michael Lewis", f:["Economics"]},
+  {t:"A Random Walk Down Wall Street", a:"Burton Malkiel", f:["Economics"]},
+
+  // Political Science
+  {t:"The Origins of Political Order", a:"Francis Fukuyama", f:["Political Science","Sociology"]},
+  {t:"Democracy in America", a:"Alexis de Tocqueville", f:["Political Science"]},
+  {t:"The Prince", a:"Niccolò Machiavelli", f:["Political Science"]},
+  {t:"Why Nations Fail", a:"Acemoglu & Robinson", f:["Political Science","Economics"]},
+  {t:"The Leviathan", a:"Thomas Hobbes", f:["Political Science"]},
+  {t:"On Liberty", a:"John Stuart Mill", f:["Political Science"]},
+  {t:"The Federalist Papers", a:"Hamilton, Madison & Jay", f:["Political Science"]},
+  {t:"How Democracies Die", a:"Levitsky & Ziblatt", f:["Political Science","Sociology"]},
+  {t:"The Power Elite", a:"C. Wright Mills", f:["Political Science","Sociology"]},
+  {t:"Political Order and Political Decay", a:"Francis Fukuyama", f:["Political Science"]},
+  {t:"The Republic", a:"Plato", f:["Political Science"]},
+
+  // Anthropology
+  {t:"Guns, Germs, and Steel", a:"Jared Diamond", f:["Anthropology","Sociology"]},
+  {t:"The Savage Mind", a:"Claude Lévi-Strauss", f:["Anthropology"]},
+  {t:"Coming of Age in Samoa", a:"Margaret Mead", f:["Anthropology"]},
+  {t:"Tristes Tropiques", a:"Claude Lévi-Strauss", f:["Anthropology"]},
+  {t:"The Gift: Forms and Functions of Exchange", a:"Marcel Mauss", f:["Anthropology","Sociology"]},
+  {t:"Argonauts of the Western Pacific", a:"Bronisław Malinowski", f:["Anthropology"]},
+  {t:"The Interpretation of Cultures", a:"Clifford Geertz", f:["Anthropology"]},
+  {t:"Sapiens: A Brief History of Humankind", a:"Yuval Noah Harari", f:["Anthropology","Sociology"]},
+  {t:"Debt: The First 5,000 Years", a:"David Graeber", f:["Anthropology","Economics"]},
+  {t:"Thinking Through Cultures", a:"Richard Shweder", f:["Anthropology","Psychology"]},
+  {t:"Orientalism", a:"Edward Said", f:["Anthropology","Political Science"]},
+
+  // Cross-field papers & articles
+  {t:"A Theory of Justice", a:"John Rawls", f:["Political Science","Sociology"]},
+  {t:"The Structure of Scientific Revolutions", a:"Thomas S. Kuhn", f:["Sociology","Computer Science"]},
+  {t:"Superintelligence: Paths, Dangers, Strategies", a:"Nick Bostrom", f:["Computer Science","Political Science"]},
+  {t:"The Age of Surveillance Capitalism", a:"Shoshana Zuboff", f:["Sociology","Computer Science","Economics"]},
+  {t:"The Second Sex", a:"Simone de Beauvoir", f:["Sociology","Political Science"]},
+  {t:"Manufacturing Consent", a:"Chomsky & Herman", f:["Political Science","Sociology"]},
+  {t:"The Black Swan", a:"Nassim Nicholas Taleb", f:["Economics","Psychology"]},
+  {t:"The Order of Things", a:"Michel Foucault", f:["Sociology","Anthropology"]},
+  {t:"Imagined Communities", a:"Benedict Anderson", f:["Political Science","Anthropology"]},
+  {t:"The Spirit Level", a:"Wilkinson & Pickett", f:["Sociology","Economics"]},
+  {t:"Empire", a:"Hardt & Negri", f:["Political Science","Sociology"]},
+  {t:"Grit: The Power of Passion and Perseverance", a:"Angela Duckworth", f:["Psychology","Sociology"]},
+  {t:"The Righteous Mind", a:"Jonathan Haidt", f:["Psychology","Political Science"]},
+  {t:"Doughnut Economics", a:"Kate Raworth", f:["Economics","Political Science"]},
+  {t:"The Checklist Manifesto", a:"Atul Gawande", f:["Psychology","Sociology"]},
+  {t:"Hillbilly Elegy", a:"J.D. Vance", f:["Sociology","Political Science"]},
+  {t:"The New Yorker: 'The Tragedy of the Commons'", a:"Garrett Hardin", f:["Economics","Political Science"]},
+  {t:"American Nations: A History of the Eleven Rival Regional Cultures", a:"Colin Woodard", f:["Political Science","Anthropology"]},
+  {t:"Science in Action", a:"Bruno Latour", f:["Sociology","Computer Science"]},
+  {t:"Invisible Man", a:"Ralph Ellison", f:["Sociology","Anthropology"]},
+  {t:"The Precipice: Existential Risk and the Future of Humanity", a:"Toby Ord", f:["Political Science","Computer Science"]},
+  {t:"Thinking, Fast and Slow [Reprint]", a:"Daniel Kahneman", f:["Economics","Sociology"]},
+];
+
+// Pad to exactly 100 unique items (already close)
+while (RAW_TITLES.length < 100) {
+  RAW_TITLES.push({
+    t: `Working Paper ${RAW_TITLES.length + 1}: Social Dynamics in Institutional Settings`,
+    a: `Author et al.`,
+    f: [FIELDS[RAW_TITLES.length % FIELDS.length], FIELDS[(RAW_TITLES.length + 2) % FIELDS.length]]
+  });
+}
+const TITLES_100 = RAW_TITLES.slice(0, 100);
+
+// Assign each title a school set and base score
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+}
+
+const CATALOG = TITLES_100.map((item, i) => {
+  const r = seededRand(i * 31 + 7);
+  const numSchools = Math.floor(r() * 3) + 1;
+  const schoolSet = SCHOOLS.slice().sort(() => r() - 0.5).slice(0, numSchools);
+  // Synthetic trend: 5 years of counts
+  const baseScore = Math.floor(r() * 280) + 20;
+  const trend = Array.from({length: 5}, (_, t) => {
+    const v = baseScore * (0.5 + 0.12 * t + (r() - 0.5) * 0.3);
+    return Math.max(5, Math.round(v));
+  });
+  return {
+    id: i,
+    title: item.t,
+    author: item.a,
+    fields: item.f,
+    schools: schoolSet,
+    baseScore,
+    trend,
+  };
+});
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let state = {
+  school: '',
+  topic: '',
+  selectedTitle: null,
+  topN: 10,
+  page: 1,
+  sortDir: 'desc',
+  username: 'researcher',
+  filteredData: [],
+  allFiltered: [],
+};
+
+// ─── LOGIN ───────────────────────────────────────────────────────────────────
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim() || 'researcher';
+  state.username = u;
+  document.getElementById('topbar-username').textContent = u;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  applyFilters();
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+function doLogout() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+// ─── TITLE DROPDOWN ──────────────────────────────────────────────────────────
+function onTitleInput() {
+  const q = document.getElementById('title-search').value.toLowerCase();
+  const dd = document.getElementById('title-dropdown');
+  if (!q) { dd.style.display = 'none'; return; }
+  const matches = CATALOG.filter(c =>
+    c.title.toLowerCase().includes(q) || c.author.toLowerCase().includes(q)
+  ).slice(0, 12);
+  if (!matches.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = matches.map(c =>
+    `<div class="title-option" onclick="selectTitle(${c.id})">${c.title} <span style="color:var(--ink-light);font-style:italic">${c.author}</span></div>`
+  ).join('');
+  dd.style.display = 'block';
+}
+
+function onTitleFocus() { onTitleInput(); }
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.title-search-wrapper')) {
+    document.getElementById('title-dropdown').style.display = 'none';
+  }
+});
+
+function selectTitle(id) {
+  const item = CATALOG.find(c => c.id === id);
+  state.selectedTitle = item;
+  document.getElementById('title-search').value = '';
+  document.getElementById('title-dropdown').style.display = 'none';
+  renderSelectedTitle();
+  applyFilters();
+}
+
+function renderSelectedTitle() {
+  const el = document.getElementById('selected-title-display');
+  const badge = document.getElementById('mode-badge');
+  if (state.selectedTitle) {
+    el.innerHTML = `<div class="selected-title"><span>${state.selectedTitle.title}</span><span class="clear-title" onclick="clearPivot()">×</span></div>`;
+    badge.innerHTML = `<span class="mode-indicator mode-coassigned">Co-assignment mode</span>`;
+  } else {
+    el.innerHTML = '';
+    badge.innerHTML = `<span class="mode-indicator mode-assigned">Assignment ranking mode</span>`;
+  }
+}
+
+function clearPivot() {
+  state.selectedTitle = null;
+  document.getElementById('title-search').value = '';
+  renderSelectedTitle();
+  applyFilters();
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function applyFilters() {
+  state.school = document.getElementById('filter-school').value;
+  state.topic = document.getElementById('filter-topic').value;
+  state.topN = parseInt(document.getElementById('filter-n').value);
+  state.page = 1;
+  renderActiveFilters();
+  computeData();
+  renderTable();
+}
+
+function resetAll() {
+  document.getElementById('filter-school').value = '';
+  document.getElementById('filter-topic').value = '';
+  document.getElementById('filter-n').value = '10';
+  state.selectedTitle = null;
+  document.getElementById('title-search').value = '';
+  renderSelectedTitle();
+  applyFilters();
+}
+
+function renderActiveFilters() {
+  const el = document.getElementById('active-filters');
+  const pills = [];
+  if (state.school) pills.push(`<span class="filter-pill">School: ${state.school} <span class="filter-pill-remove" onclick="clearFilter('school')">×</span></span>`);
+  if (state.topic) pills.push(`<span class="filter-pill">Field: ${state.topic} <span class="filter-pill-remove" onclick="clearFilter('topic')">×</span></span>`);
+  if (state.selectedTitle) pills.push(`<span class="filter-pill" style="background:var(--warn)">Pivot: ${state.selectedTitle.title.slice(0,30)}… <span class="filter-pill-remove" onclick="clearPivot()">×</span></span>`);
+  el.innerHTML = pills.join('');
+}
+
+function clearFilter(f) {
+  if (f === 'school') { document.getElementById('filter-school').value = ''; state.school = ''; }
+  if (f === 'topic') { document.getElementById('filter-topic').value = ''; state.topic = ''; }
+  renderActiveFilters();
+  computeData();
+  renderTable();
+}
+
+// ─── DATA COMPUTATION ────────────────────────────────────────────────────────
+function computeData() {
+  let data = CATALOG.slice();
+
+  // Filter by school
+  if (state.school) data = data.filter(d => d.schools.includes(state.school));
+
+  // Filter by topic
+  if (state.topic) data = data.filter(d => d.fields.includes(state.topic));
+
+  if (state.selectedTitle) {
+    // Co-assignment mode: remove the pivot title itself, assign co-scores
+    const pivotId = state.selectedTitle.id;
+    data = data.filter(d => d.id !== pivotId);
+    // Pseudo co-assignment score: seeded random per pair, modulated by shared fields
+    data = data.map(d => {
+      const r = seededRand(pivotId * 97 + d.id * 13);
+      const sharedFields = d.fields.filter(f => state.selectedTitle.fields.includes(f)).length;
+      const coScore = Math.round(r() * 180 + sharedFields * 30 + 10);
+      return {...d, displayScore: coScore};
+    });
+  } else {
+    data = data.map(d => ({...d, displayScore: d.baseScore}));
+  }
+
+  // Sort descending
+  data.sort((a, b) => b.displayScore - a.displayScore);
+
+  // Limit to topN
+  data = data.slice(0, state.topN);
+
+  state.allFiltered = data;
+  state.filteredData = data;
+}
+
+// ─── TABLE RENDER ─────────────────────────────────────────────────────────────
+const PAGE_SIZE = 10;
+
+function renderTable() {
+  const data = state.filteredData;
+  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
+  if (state.page > totalPages) state.page = totalPages;
+
+  const page = data.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
+  const maxScore = data.length ? data[0].displayScore : 1;
+
+  // Update header
+  const mainTitle = state.selectedTitle
+    ? 'Co-assignment Rankings'
+    : 'Most Assigned Readings';
+  document.getElementById('main-title').textContent = mainTitle;
+
+  let sub = '';
+  if (!state.school && !state.topic) sub = 'All institutions · All fields · ';
+  else {
+    if (state.school) sub += state.school + ' · ';
+    if (state.topic) sub += state.topic + ' · ';
+  }
+  sub += state.selectedTitle
+    ? `Co-assigned with selected title · Ranked by co-assignment score`
+    : `Ranked by assignment count`;
+  document.getElementById('main-subtitle').textContent = sub;
+
+  document.getElementById('result-count').textContent = `${data.length} title${data.length !== 1 ? 's' : ''}`;
+
+  // Co-assignment banner
+  const banner = document.getElementById('coassign-banner');
+  if (state.selectedTitle) {
+    banner.style.display = 'flex';
+    document.getElementById('coassign-pivot-title').textContent = `"${state.selectedTitle.title}" — ${state.selectedTitle.author}`;
+  } else {
+    banner.style.display = 'none';
+  }
+
+  const tbody = document.getElementById('results-body');
+  const empty = document.getElementById('empty-state');
+
+  if (!page.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+  const colLabel = state.selectedTitle ? 'Co-Score' : 'Score';
+  document.querySelector('#th-score').textContent = colLabel + ' ↓';
+
+  tbody.innerHTML = page.map((row, i) => {
+    const globalRank = (state.page - 1) * PAGE_SIZE + i + 1;
+    const barPct = Math.round((row.displayScore / maxScore) * 100);
+    const chips = row.fields.map(f =>
+      `<span class="chip chip-${f.replace(/\s/g,'')}" onclick="pivotField('${f}')" title="Filter by ${f}">${f}</span>`
+    ).join('');
+    const spark = renderSparkline(row.trend);
+    const schoolBadge = state.selectedTitle
+      ? `<span class="coassign-badge">${row.displayScore}</span>`
+      : row.displayScore;
+    return `<tr>
+      <td class="rank-cell">${globalRank}</td>
+      <td class="title-cell">
+        <span class="title-link" onclick="selectTitle(${row.id})">${row.title}</span>
+        <div class="author">${row.author}</div>
+      </td>
+      <td class="chips-cell">${chips}</td>
+      <td class="score-cell">
+        ${schoolBadge}
+        <span class="score-bar-wrap"><span class="score-bar" style="width:${barPct}%"></span></span>
+      </td>
+      <td class="score-cell" style="font-size:11px">${row.schools.map(s => `<span class="school-link" onclick="pivotSchool('${s}')" title="Filter by ${s}">${s}</span>`).join('<span style="color:var(--rule);margin:0 3px">·</span>')}</td>
+      <td class="spark-cell">${spark}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination(totalPages);
+}
+
+function renderSparkline(trend) {
+  const w = 80, h = 28, pad = 2;
+  const min = Math.min(...trend), max = Math.max(...trend);
+  const range = max - min || 1;
+  const pts = trend.map((v, i) => {
+    const x = pad + (i / (trend.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg class="sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${pts.split(' ').pop().split(',')[0]}" cy="${pts.split(' ').pop().split(',')[1]}" r="2" fill="var(--accent)"/>
+  </svg>`;
+}
+
+function renderPagination(totalPages) {
+  const el = document.getElementById('pagination');
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  const p = state.page;
+  let html = `<div class="page-info">Page ${p} of ${totalPages}</div><div class="page-btns">`;
+  html += `<button class="page-btn" onclick="goPage(${p-1})" ${p===1?'disabled':''}>‹ Prev</button>`;
+  for (let i = 1; i <= totalPages; i++) {
+    if (totalPages > 8 && i > 2 && i < totalPages - 1 && Math.abs(i - p) > 1) {
+      if (i === 3 || i === totalPages - 2) html += `<button class="page-btn" disabled>…</button>`;
+      continue;
+    }
+    html += `<button class="page-btn ${i===p?'active':''}" onclick="goPage(${i})">${i}</button>`;
+  }
+  html += `<button class="page-btn" onclick="goPage(${p+1})" ${p===totalPages?'disabled':''}>Next ›</button>`;
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(state.filteredData.length / PAGE_SIZE);
+  if (p < 1 || p > totalPages) return;
+  state.page = p;
+  renderTable();
+  document.querySelector('.table-wrap').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function pivotSchool(school) {
+  document.getElementById('filter-school').value = school;
+  state.school = school;
+  renderActiveFilters();
+  computeData();
+  renderTable();
+  showToast(`Filtered by institution: ${school}`);
+}
+
+function pivotField(field) {
+  document.getElementById('filter-topic').value = field;
+  state.topic = field;
+  renderActiveFilters();
+  computeData();
+  renderTable();
+  showToast(`Filtered by field: ${field}`);
+}
+
+function sortBy(col) {
+  // Currently only score; toggle direction
+  state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+  state.filteredData.sort((a, b) =>
+    state.sortDir === 'desc' ? b.displayScore - a.displayScore : a.displayScore - b.displayScore
+  );
+  document.getElementById('th-score').textContent = 'Score ' + (state.sortDir === 'desc' ? '↓' : '↑');
+  state.page = 1;
+  renderTable();
+}
+
+// ─── CSV DOWNLOAD ─────────────────────────────────────────────────────────────
+function downloadCSV() {
+  const data = state.allFiltered;
+  if (!data.length) { showToast('No data to download.'); return; }
+  const isCoassign = !!state.selectedTitle;
+  const header = ['Rank','Title','Author','Fields','Schools', isCoassign ? 'Co-Assignment Score' : 'Assignment Score','Trend (5yr)'].join(',');
+  const rows = data.map((row, i) => [
+    i + 1,
+    `"${row.title.replace(/"/g,'""')}"`,
+    `"${row.author.replace(/"/g,'""')}"`,
+    `"${row.fields.join('; ')}"`,
+    `"${row.schools.join('; ')}"`,
+    row.displayScore,
+    `"${row.trend.join(', ')}"`,
+  ].join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `syllabuslens_${state.school||'all'}_${state.topic||'all'}_${isCoassign?'coassign':'assigned'}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV downloaded ✓');
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+renderSelectedTitle();
+</script>
+</body>
+</html>
