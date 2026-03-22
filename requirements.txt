@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+aiosqlite
+google-cloud-storage
+pymupdf
+pdfplumber
+rapidfuzz
+pandas
+httpx
