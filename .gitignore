@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 data/samples/
 data/syllabus.db
+data/annotation_round1/
+data/annotation_round1.zip
 .env
 .DS_Store
 syllabi_index.csv
