@@ -1,13 +1,15 @@
 """Extract citations (title + author) from syllabus text.
 
-Multi-stage pipeline:
-1. Section detection: find reference/reading list sections
-2. Citation parsing: regex-based structured extraction
-3. Title deduplication: fuzzy matching to canonical titles
+Supports two extraction backends:
+  - "llm" (default): sends reference sections to Claude for structured extraction
+  - "regex": pattern-matching fallback (48% precision, 86% recall)
 """
 
+import json
+import os
 import re
 import sys
+import time
 from pathlib import Path
 from dataclasses import dataclass, field
 
@@ -16,6 +18,10 @@ from rapidfuzz import fuzz, process
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import SAMPLES_DIR
 from pipeline.text_extraction import extract_text
+
+EXTRACTION_METHOD = os.environ.get("CITATION_METHOD", "llm")
+
+# ── Section detection (shared by both methods) ──────────────────────────────
 
 SECTION_PATTERNS = [
     r"(?i)(?:^|\n)\s*(?:required\s+)?(?:text(?:s|book(?:s)?)?|reading(?:s)?)\s*(?:and\s+materials?)?\s*[:\-\n]",
@@ -70,32 +76,130 @@ def find_reference_sections(text: str) -> list[str]:
     return sections
 
 
+# ── LLM extraction (Claude via Anthropic API) ───────────────────────────────
+
+LLM_SYSTEM_PROMPT = """You are a citation extraction assistant. You will receive text from a university course syllabus. Your job is to extract all books, textbooks, articles, and other reading materials that are assigned or referenced.
+
+For each citation found, extract:
+- title: the full title of the work
+- authors: author name(s), as written
+- year: publication year if mentioned
+- edition: edition info if mentioned
+
+Rules:
+- Only extract actual published works (books, articles, textbooks, manuals)
+- Do NOT extract course names, assignment descriptions, university policies, software tools, or websites
+- Do NOT extract instructor names unless they are authors of an assigned work
+- If a work appears multiple times, include it only once
+- If no citations are found, return an empty array
+
+Respond with ONLY a JSON array, no other text. Example:
+[{"title": "Introduction to Algorithms", "authors": "Cormen, Leiserson, Rivest & Stein", "year": "2009", "edition": "3rd"}]"""
+
+
+def _get_anthropic_client():
+    import anthropic
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY environment variable not set. "
+            "Set it or use CITATION_METHOD=regex to fall back to regex extraction."
+        )
+    return anthropic.Anthropic(api_key=api_key)
+
+
+MAX_TEXT_CHARS = 100_000
+
+
+def extract_citations_llm(text: str, max_retries: int = 2) -> list[RawCitation] | None:
+    """Extract citations using Claude.
+
+    Sends the full syllabus text so that citations embedded in course
+    schedules or weekly reading lists are not missed.
+
+    Returns None if the text exceeds MAX_TEXT_CHARS (caller should skip).
+    """
+    if len(text) > MAX_TEXT_CHARS:
+        return None
+
+    content = text
+
+    client = _get_anthropic_client()
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.messages.create(
+                model="claude-opus-4-6",
+                max_tokens=2048,
+                system=LLM_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": content}],
+            )
+            raw = response.content[0].text.strip()
+
+            if raw.startswith("```"):
+                raw = re.sub(r"^```(?:json)?\s*", "", raw)
+                raw = re.sub(r"\s*```$", "", raw)
+
+            citations_data = json.loads(raw)
+            if not isinstance(citations_data, list):
+                return []
+
+            citations = []
+            seen = set()
+            for item in citations_data:
+                if not isinstance(item, dict):
+                    continue
+                title = (item.get("title") or "").strip()
+                if not title or len(title) < 5:
+                    continue
+                key = title.lower()[:60]
+                if key in seen:
+                    continue
+                seen.add(key)
+                citations.append(RawCitation(
+                    title=title,
+                    authors=(item.get("authors") or "").strip(),
+                    year=(item.get("year") or "").strip(),
+                    edition=(item.get("edition") or "").strip(),
+                ))
+            return citations
+
+        except json.JSONDecodeError:
+            if attempt < max_retries:
+                time.sleep(1)
+                continue
+            return []
+        except Exception as e:
+            if "rate_limit" in str(e).lower() or "overloaded" in str(e).lower():
+                time.sleep(5 * (attempt + 1))
+                if attempt < max_retries:
+                    continue
+            raise
+
+
+# ── Regex extraction (fallback) ─────────────────────────────────────────────
+
 BOOK_PATTERNS = [
-    # Author (Year). Title. Publisher.
     re.compile(
         r"(?P<authors>[A-Z][a-zA-Z\.\-\s,&]+?)\s*"
         r"\((?P<year>\d{4})\)\s*[.,]?\s*"
         r"(?P<title>[A-Z][^.]{10,150}?)\s*[.,]"
     ),
-    # Author. Title (Year|edition). Publisher.
     re.compile(
         r"(?P<authors>[A-Z][a-zA-Z\.\-\s,&]+?)\s*[.,]\s*"
         r"(?P<title>[A-Z][^.]{10,150}?)\s*"
         r"[\(,]\s*(?:(?P<year>\d{4})|(?P<edition>\d+\w*\s*ed(?:ition)?))"
     ),
-    # Title by Author (possibly with ISBN or publisher after)
     re.compile(
         r"(?P<title>[A-Z][^.]{10,150}?)\s*"
         r"(?:by|,\s*by)\s+"
         r"(?P<authors>[A-Z][a-zA-Z\.\-\s,&]+?)(?:\s*[.,\(]|$)"
     ),
-    # "Title" - Author
     re.compile(
         r'["\u201c](?P<title>[^"\u201d]{10,150})["\u201d]\s*'
         r"[-\u2013\u2014,]\s*"
         r"(?P<authors>[A-Z][a-zA-Z\.\-\s,&]{3,80}?)(?:\s*[.,\(]|$)"
     ),
-    # Bullet or numbered list: Title, Author (very common in syllabi)
     re.compile(
         r"(?:^|\n)\s*(?:[\u2022\u2023\u25CF\u25CB\-\*]|\d+[.\)])\s*"
         r"(?P<title>[A-Z][^,\n]{10,150}?),\s*"
@@ -132,7 +236,6 @@ TITLE_BLOCKLIST_PATTERNS = [
 
 
 def is_plausible_title(title: str) -> bool:
-    """Filter out false-positive title extractions."""
     t = title.strip().lower()
     if len(t) < 8 or len(t) > 300:
         return False
@@ -151,7 +254,6 @@ def is_plausible_title(title: str) -> bool:
 
 
 def is_plausible_author(author: str) -> bool:
-    """Filter out false-positive author extractions."""
     a = author.strip()
     if len(a) < 3 or len(a) > 200:
         return False
@@ -162,8 +264,8 @@ def is_plausible_author(author: str) -> bool:
     return True
 
 
-def extract_citations_from_text(text: str) -> list[RawCitation]:
-    """Extract citations from syllabus text."""
+def extract_citations_regex(text: str) -> list[RawCitation]:
+    """Extract citations using regex patterns (fallback method)."""
     sections = find_reference_sections(text)
     if not sections:
         sections = [text[:10000]]
@@ -202,6 +304,25 @@ def extract_citations_from_text(text: str) -> list[RawCitation]:
     return citations
 
 
+# ── Public API ──────────────────────────────────────────────────────────────
+
+def extract_citations_from_text(text: str) -> list[RawCitation] | None:
+    """Extract citations using the configured method (LLM or regex).
+
+    Returns None if the text is too long and should be skipped.
+    """
+    method = EXTRACTION_METHOD
+    if method == "llm":
+        try:
+            return extract_citations_llm(text)
+        except RuntimeError:
+            print("  [warn] LLM unavailable, falling back to regex")
+            return extract_citations_regex(text)
+    return extract_citations_regex(text)
+
+
+# ── Deduplication ───────────────────────────────────────────────────────────
+
 def normalize_title(title: str) -> str:
     """Normalize a title for deduplication matching."""
     t = title.lower().strip()
@@ -218,12 +339,7 @@ def deduplicate_titles(
     all_citations: list[tuple[int, RawCitation]],
     threshold: int = 80,
 ) -> list[CanonicalTitle]:
-    """Cluster citations into canonical titles using fuzzy matching.
-
-    Args:
-        all_citations: list of (syllabus_id, RawCitation) tuples
-        threshold: rapidfuzz similarity threshold (0-100)
-    """
+    """Cluster citations into canonical titles using fuzzy matching."""
     normalized = []
     for syl_id, cit in all_citations:
         normalized.append((normalize_title(cit.title), syl_id, cit))
@@ -263,8 +379,20 @@ def deduplicate_titles(
     return clusters
 
 
+# ── CLI test ────────────────────────────────────────────────────────────────
+
 def test_on_samples():
     """Run citation extraction on sample PDFs and report results."""
+    method = EXTRACTION_METHOD
+    print(f"Extraction method: {method}")
+    if method == "llm":
+        try:
+            _get_anthropic_client()
+            print("Anthropic API key: OK")
+        except RuntimeError as e:
+            print(f"Anthropic API key: MISSING — {e}")
+            return
+
     all_citations = []
     syllabus_id = 0
 
@@ -278,7 +406,7 @@ def test_on_samples():
 
         for pdf in pdfs:
             syllabus_id += 1
-            text, method = extract_text(str(pdf))
+            text, method_used = extract_text(str(pdf))
             if not text:
                 print(f"  ✗ {pdf.name}: no text extracted")
                 continue
