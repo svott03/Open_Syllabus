@@ -160,12 +160,19 @@ def step_4_extract_citations(session):
     print(f"  {len(to_process)} syllabi to process ({len(already_processed)} already done)")
 
     all_citations = []
+    skipped = 0
     for syl in to_process:
         cits = extract_citations_from_text(syl.extracted_text)
+        if cits is None:
+            skipped += 1
+            print(f"  [skip] {syl.local_path}: text too long ({len(syl.extracted_text)} chars)")
+            continue
         for c in cits:
             all_citations.append((syl.id, c))
 
     print(f"  Raw citations extracted: {len(all_citations)}")
+    if skipped:
+        print(f"  Skipped (text too long): {skipped}")
 
     if not all_citations:
         print("  No citations found, skipping deduplication")
