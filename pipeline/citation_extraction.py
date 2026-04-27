@@ -110,6 +110,40 @@ def _get_anthropic_client():
 
 MAX_TEXT_CHARS = 100_000
 
+COST_PER_1M_INPUT = {
+    "claude-opus-4-6": 15.00,
+    "claude-sonnet-4-20250514": 3.00,
+    "claude-haiku-3-5-20241022": 0.80,
+}
+COST_PER_1M_OUTPUT = {
+    "claude-opus-4-6": 75.00,
+    "claude-sonnet-4-20250514": 15.00,
+    "claude-haiku-3-5-20241022": 4.00,
+}
+MODEL_NAME = "claude-sonnet-4-20250514"
+
+_cost_tracker = {"input_tokens": 0, "output_tokens": 0, "calls": 0}
+
+
+def get_cost_summary() -> dict:
+    """Return cumulative token usage and estimated cost."""
+    inp = _cost_tracker["input_tokens"]
+    out = _cost_tracker["output_tokens"]
+    cost_in = inp / 1_000_000 * COST_PER_1M_INPUT.get(MODEL_NAME, 0)
+    cost_out = out / 1_000_000 * COST_PER_1M_OUTPUT.get(MODEL_NAME, 0)
+    return {
+        "calls": _cost_tracker["calls"],
+        "input_tokens": inp,
+        "output_tokens": out,
+        "cost_usd": round(cost_in + cost_out, 4),
+    }
+
+
+def reset_cost_tracker():
+    _cost_tracker["input_tokens"] = 0
+    _cost_tracker["output_tokens"] = 0
+    _cost_tracker["calls"] = 0
+
 
 def extract_citations_llm(text: str, max_retries: int = 2) -> list[RawCitation] | None:
     """Extract citations using Claude.
@@ -129,11 +163,14 @@ def extract_citations_llm(text: str, max_retries: int = 2) -> list[RawCitation] 
     for attempt in range(max_retries + 1):
         try:
             response = client.messages.create(
-                model="claude-opus-4-6",
+                model=MODEL_NAME,
                 max_tokens=2048,
                 system=LLM_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": content}],
             )
+            _cost_tracker["input_tokens"] += response.usage.input_tokens
+            _cost_tracker["output_tokens"] += response.usage.output_tokens
+            _cost_tracker["calls"] += 1
             raw = response.content[0].text.strip()
 
             if raw.startswith("```"):
