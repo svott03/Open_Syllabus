@@ -41,10 +41,17 @@ STOP_SECTIONS = [
 @dataclass
 class RawCitation:
     title: str
+    first_name: str = ""
+    last_name: str = ""
     authors: str = ""
     year: str = ""
     edition: str = ""
     raw_text: str = ""
+
+    def __post_init__(self):
+        if not self.authors and (self.first_name or self.last_name):
+            parts = [p for p in (self.first_name, self.last_name) if p]
+            self.authors = " ".join(parts)
 
 
 @dataclass
@@ -78,23 +85,60 @@ def find_reference_sections(text: str) -> list[str]:
 
 # ── LLM extraction (Claude via Anthropic API) ───────────────────────────────
 
-LLM_SYSTEM_PROMPT = """You are a citation extraction assistant. You will receive text from a university course syllabus. Your job is to extract all books, textbooks, articles, and other reading materials that are assigned or referenced.
+LLM_SYSTEM_PROMPT = """\
+You are a citation extraction system. You will receive the full text of a \
+university course syllabus. Extract every book or textbook that is required, \
+suggested, or has chapters/excerpts assigned anywhere in the syllabus \
+(including the course schedule or weekly reading lists).
 
-For each citation found, extract:
-- title: the full title of the work
-- authors: author name(s), as written
-- year: publication year if mentioned
-- edition: edition info if mentioned
+Scope — what to include:
+- Books and textbooks listed as required readings.
+- Books and textbooks listed as suggested or recommended readings.
+- Books or textbooks not in the readings section but whose chapters or \
+excerpts appear in the course schedule.
+- If a chapter or short story is assigned as part of a larger book, list the \
+larger book, not the chapter or story.
 
-Rules:
-- Only extract actual published works (books, articles, textbooks, manuals)
-- Do NOT extract course names, assignment descriptions, university policies, software tools, or websites
-- Do NOT extract instructor names unless they are authors of an assigned work
-- If a work appears multiple times, include it only once
-- If no citations are found, return an empty array
+Scope — what to exclude:
+- Short works such as journal articles, interviews, essays, poems, or other \
+works that would conventionally be quoted (not italicized) under APA style.
+- Course names, assignment descriptions, university policies, software, \
+or websites.
+- Instructor names (unless they are an author of an assigned book).
 
-Respond with ONLY a JSON array, no other text. Example:
-[{"title": "Introduction to Algorithms", "authors": "Cormen, Leiserson, Rivest & Stein", "year": "2009", "edition": "3rd"}]"""
+Title rules:
+- Each book gets its own entry.
+- Copy the title exactly as it appears in the syllabus, preserving the \
+syllabus's own capitalization style.
+- Preserve all non-English characters (umlauts, accents, macrons, etc.).
+- Never include edition information in the title.
+- If a title is hyphenated only because it spans a line break in the PDF, \
+remove that hyphen and join the word.
+
+Author rules:
+- List only the first author of each work.
+- Provide separate first_name and last_name fields.
+- Mimic the name form used in the syllabus: if only a last name appears, \
+leave first_name empty. Do not look up or infer names not present in the \
+syllabus.
+- If the author has a single name or is an institution (e.g. Aristotle, \
+LUMA Institute), put it in first_name and leave last_name empty.
+- Preserve non-English characters in names.
+
+Empty syllabi:
+- If no books or textbooks are found anywhere in the syllabus, return \
+exactly: [{"title": "None"}]
+
+Output format:
+- Respond with ONLY a JSON array — no markdown fences, no commentary.
+- Each element: {"title": "...", "first_name": "...", "last_name": "..."}
+- Omit first_name or last_name when not applicable (do not use empty strings).
+- If a work appears multiple times, include it only once.
+
+Example:
+[{"title": "Introduction to Algorithms", "first_name": "Thomas", \
+"last_name": "Cormen"}, {"title": "Nicomachean Ethics", \
+"first_name": "Aristotle"}]"""
 
 
 def _get_anthropic_client():
@@ -187,17 +231,27 @@ def extract_citations_llm(text: str, max_retries: int = 2) -> list[RawCitation] 
                 if not isinstance(item, dict):
                     continue
                 title = (item.get("title") or "").strip()
-                if not title or len(title) < 5:
+                if not title:
+                    continue
+                if title == "None":
+                    return []
+                if len(title) < 5:
                     continue
                 key = title.lower()[:60]
                 if key in seen:
                     continue
                 seen.add(key)
+
+                first = (item.get("first_name") or "").strip()
+                last = (item.get("last_name") or "").strip()
+                authors = (item.get("authors") or "").strip()
+
                 citations.append(RawCitation(
                     title=title,
-                    authors=(item.get("authors") or "").strip(),
+                    first_name=first,
+                    last_name=last,
+                    authors=authors,
                     year=(item.get("year") or "").strip(),
-                    edition=(item.get("edition") or "").strip(),
                 ))
             return citations
 
