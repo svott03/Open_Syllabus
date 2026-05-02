@@ -9,8 +9,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from db.models import init_db
 from api.routes import router
+
+BASE_DIR = Path(__file__).parent.parent
 
 
 @asynccontextmanager
@@ -35,3 +38,8 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+
+
+@app.get("/", include_in_schema=False)
+async def serve_frontend():
+    return FileResponse(BASE_DIR / "syllabus_explorer.html", media_type="text/html")
